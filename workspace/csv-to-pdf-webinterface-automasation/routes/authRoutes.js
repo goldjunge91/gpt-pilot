@@ -1,11 +1,12 @@
 const express = require('express');
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
-const { checkAuthenticated } = require('../middleware/authMiddleware');
 const router = express.Router();
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
+const { checkAuthenticated } = require('../middleware/authMiddleware');
+const { validate, generateToken } = require('./authUtils');
 
 // Load environment variables
 dotenv.config();
@@ -65,43 +66,71 @@ router.get('/auth/register', (req, res) => {
   console.log("route get /auth/register")
 });
 
-router.post('/register', async (req, res) => {
+
+router.post('/login', async (req, res) => {
   try {
-    const { username, password, email, } = req.body;
+    const { username, password } = req.body;
 
-    // Validate input
-    if (!username || !password || !email) {
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
+    // Validate credentials
+    await validate(username, password);
 
-    // Check if the user already exists in the database
-    const existingUser = await User.findOne({ username });
+    // Generate JWT token
+    const token = generateToken(username);
 
-    if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
-    }
-    console.log('post /register passwordlog ', password);
-    console.log('post register passwordlog ', password.length);
-    console.log('post registerusername log eingabe:', username);
-    console.log('email log eingabe:', email);
-    // Create a new user
-    const newUser = new User({ username, email });
-    newUser.password = await bcrypt.hash(password, 10);
-    console.log('passwordlog ', password);
-    console.log('passwordlog ', password.length);
-    console.log('username log eingabe:', username);
-    console.log('post register email log eingabe:', email);
+    // Return API response
+    res.json({
+      status: 'success',
+      message: 'Logged in successfully',
+      token
+    });
 
-    // Save the user to the database
-    await newUser.save();
-    console.log('new user saved:' + newUser.save());
-
-    res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
-    console.error('Error during registration:', error);
-    res.status(500).json({ error: 'Error during registration' });
+    res.status(400).json({
+      status: 'error',
+      message: error.message
+    });
   }
 });
+
+
+// Don't forget to export the router
+// router.post('/register', async (req, res) => {
+//   try {
+//     const { username, password, email, } = req.body;
+
+//     // Validate input
+//     if (!username || !password || !email) {
+//       return res.status(400).json({ error: 'Username and password are required' });
+//     }
+
+//     // Check if the user already exists in the database
+//     const existingUser = await User.findOne({ username });
+
+//     if (existingUser) {
+//       return res.status(400).json({ error: 'Username already exists' });
+//     }
+//     console.log('post /register passwordlog ', password);
+//     console.log('post register passwordlog ', password.length);
+//     console.log('post registerusername log eingabe:', username);
+//     console.log('email log eingabe:', email);
+//     // Create a new user
+//     const newUser = new User({ username, email });
+//     newUser.password = await bcrypt.hash(password, 10);
+//     console.log('passwordlog ', password);
+//     console.log('passwordlog ', password.length);
+//     console.log('username log eingabe:', username);
+//     console.log('post register email log eingabe:', email);
+
+//     // Save the user to the database
+//     await newUser.save();
+//     console.log('new user saved:' + newUser.save());
+
+//     res.status(201).json({ message: 'User registered successfully' });
+//   } catch (error) {
+//     console.error('Error during registration:', error);
+//     res.status(500).json({ error: 'Error during registration' });
+//   }
+// });
 
 // GET / login
 router.get('/auth/login', (req, res) => {
@@ -111,24 +140,17 @@ router.get('/auth/login', (req, res) => {
   res.render('login', {
     session: req.session
   });
-  console.log(req.session);
   console.log(req.user);
-  console.log("route get /auth/login")
+  console.log("route /auth/login")
 });
 
 // POST /login
-router.post('/auth/login', checkAuthenticated, async (req, res) => {
+router.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    console.log(req.session);
-    console.log(req.user);
-    console.log("route post /auth/login")
 
     // Validate input
     if (!username || !password) {
-      console.log(req.session);
-      console.log(req.user);
-      console.log("route post /auth/login / Validate input")
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
@@ -136,9 +158,6 @@ router.post('/auth/login', checkAuthenticated, async (req, res) => {
     const user = await User.findOne({ username });
 
     if (!user) {
-      console.log(req.session);
-      console.log(req.user);
-      console.log("route get /auth/login / // Find the user by username")
       return res.status(400).json({ error: 'User not found' });
     }
 
@@ -147,36 +166,25 @@ router.post('/auth/login', checkAuthenticated, async (req, res) => {
     console.log('isMatch true user password:', isMatch);
 
     if (isMatch) {
-      console.log(req.session);
-      console.log(req.user);
-      console.log("route get /auth/login if match")
-      req.session.userId = user._id;
-      console.log(req.session);
-      console.log(req.user);
-      console.log(req.session.userId);
-      console.log("route get /auth/login if match")
-      res.redirect('/home');
+      req.session.userId = user.id;
+
+      // Create a JSON Web Tokenn
+      const token = jwt.sign({
+        username: user.username
+      }, process.env.JWT_SECRET, {
+        expiresIn: '1h'
+      });
+
+      res.cookie('token', token, { httpOnly: true });
+
+      res.redirect('/');
     } else {
       res.status(400).json({ error: 'Password is incorrect' });
-    };
-
-    // Create a JSON Web Tokenn
-    const token = jwt.sign({
-      username: user.username
-    }, process.env.JWT_SECRET, {
-      expiresIn: '1h'
-    });
-
-    res.cookie('token', token, { httpOnly: true });
-
-    res.redirect('/home');
-  } else {
-    res.status(400).json({ error: 'Password is incorrect' });
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ error: 'Error during login' });
   }
-} catch (error) {
-  console.error('Error during login:', error);
-  res.status(500).json({ error: 'Error during login' });
-}
 });
 
 // GET /logout
