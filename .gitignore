@@ -167,8 +167,9 @@ cython_debug/
 /pilot/gpt-pilot
 
 # workspace
-workspace
+#workspace
 pilot-env/
-
+*/node_modules
+*node_modules
 # Other
 brija.py
