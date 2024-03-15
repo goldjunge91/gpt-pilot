@@ -52,8 +52,8 @@ userSchema.methods.comparePassword = function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-const User = mongoose.models?.User || mongoose.model("User", userSchema);
-
+// const User = mongoose.models?.User || mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 module.exports = User;
 const MONGODB_URI = (process.env.DATABASE_URL);
 

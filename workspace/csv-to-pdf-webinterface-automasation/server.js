@@ -1,4 +1,5 @@
-// Load environment variables
+// <!--''' -----------------------format----------------------------javascript -->'''
+//  Load environment variables
 require("dotenv").config();
 const mongoose = require("mongoose");
 const express = require("express");
@@ -57,17 +58,23 @@ app.use(session({
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
   },
-})
-);
-// add this 
-app.use((req, res, next) => {
-  console.log('SESSION MIDDLEWARE zeile 64 app.');
-  next();
-})
+}));
 
+// Add the following line for session middleware
+// app.use((req, res, next) => {
+//   console.log('SESSION MIDDLEWARE zeile 64 app.');
+//   next();
+// });
+app.use((req, res, next) => {
+  if (!req.session.userId) {
+    req.session.userId = null;
+  }
+  next();
+});
 
 
 // Ping route
+let message = "pong";
 app.get("/ping", async (req, res) => {
   try {
     console.log(("PING ROUTE", message));
@@ -81,14 +88,11 @@ app.get("/ping", async (req, res) => {
   }
 });
 
-
 app.use("/", authRoutes);
-
-/*
-// app.use('/auth', authRoutes);
-// app.use("/register", authRoutes);*/
-// app.use("/auth", authRoutes);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+// ```
+// ------------------------end\_of\_format---------------------------

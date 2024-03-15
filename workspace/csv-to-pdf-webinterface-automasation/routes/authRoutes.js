@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
+const { checkAuthenticated } = require('../middleware/authMiddleware');
 const router = express.Router();
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
@@ -116,7 +117,7 @@ router.get('/auth/login', (req, res) => {
 });
 
 // POST /login
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', checkAuthenticated, async (req, res) => {
   try {
     const { username, password } = req.body;
     console.log(req.session);
@@ -149,28 +150,33 @@ router.post('/auth/login', async (req, res) => {
       console.log(req.session);
       console.log(req.user);
       console.log("route get /auth/login if match")
-      req.session.userId = user.id;
+      req.session.userId = user._id;
       console.log(req.session);
       console.log(req.user);
       console.log(req.session.userId);
       console.log("route get /auth/login if match")
-      // Create a JSON Web Tokenn
-      const token = jwt.sign({
-        username: user.username
-      }, process.env.JWT_SECRET, {
-        expiresIn: '1h'
-      });
-
-      res.cookie('token', token, { httpOnly: true });
-
       res.redirect('/home');
     } else {
       res.status(400).json({ error: 'Password is incorrect' });
-    }
-  } catch (error) {
-    console.error('Error during login:', error);
-    res.status(500).json({ error: 'Error during login' });
+    };
+
+    // Create a JSON Web Tokenn
+    const token = jwt.sign({
+      username: user.username
+    }, process.env.JWT_SECRET, {
+      expiresIn: '1h'
+    });
+
+    res.cookie('token', token, { httpOnly: true });
+
+    res.redirect('/home');
+  } else {
+    res.status(400).json({ error: 'Password is incorrect' });
   }
+} catch (error) {
+  console.error('Error during login:', error);
+  res.status(500).json({ error: 'Error during login' });
+}
 });
 
 // GET /logout
